@@ -70,7 +70,7 @@ if uploaded:
         # Upload new data
         for _, row in df.iterrows():
             cur.execute(f"""
-                INSERT INTO TB_FUZZY_UPLOAD (
+                INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD (
                     UploadedCompanyName, UploadedAddress, UploadedCity,
                     UploadedState, UploadedZip, match_key
                 ) VALUES (%s, %s, %s, %s, %s, %s)
@@ -78,6 +78,7 @@ if uploaded:
                 row["companyName"], row["companyAddress"], row["companyCity"],
                 row["companyState"], row["companyZipCode"], row["match_key"]
             ))
+
 
         st.success("Data uploaded. Matching now...")
 
