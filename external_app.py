@@ -90,3 +90,17 @@ if uploaded:
         st.dataframe(result_df)
 
         st.download_button("Download Matches as CSV", result_df.to_csv(index=False), file_name="matched_results.csv")
+
+try:
+    conn = snowflake.connector.connect(
+        user=SNOWFLAKE_USER,
+        password=SNOWFLAKE_PASSWORD,
+        account=SNOWFLAKE_ACCOUNT,
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA
+    )
+except Exception as e:
+    st.error(f"Connection failed: {e}")
+    st.stop()
+
