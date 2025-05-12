@@ -1,0 +1,92 @@
+# external_app.py
+import streamlit as st
+import pandas as pd
+import snowflake.connector
+import re
+
+# --- CONFIG ---
+SNOWFLAKE_ACCOUNT = "<your_account>.snowflakecomputing.com"
+SNOWFLAKE_USER = "<your_user>"
+SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]  # secure via Streamlit Cloud secrets
+SNOWFLAKE_DATABASE = "DB_PROD_TRF"
+SNOWFLAKE_SCHEMA = "SCH_TRF_UTILS"
+SNOWFLAKE_WAREHOUSE = "WH_SERV_PROD_BI"
+
+# Connect to Snowflake
+@st.cache_resource
+def get_conn():
+    return snowflake.connector.connect(
+        user=SNOWFLAKE_USER,
+        password=SNOWFLAKE_PASSWORD,
+        account=SNOWFLAKE_ACCOUNT,
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA
+    )
+
+# Clean and normalize address fields
+ADDRESS_ABBREVIATIONS = {
+    r"\\bSTREET\\b": "ST", r"\\bST\\.$": "ST", r"\\bSAINT\\b": "ST",
+    r"\\bAVENUE\\b": "AVE", r"\\bAVE\\.$": "AVE", r"\\bDRIVE\\b": "DR",
+    r"\\bDR\\.$": "DR", r"\\bCOURT\\b": "CT", r"\\bCT\\.$": "CT",
+    r"\\bROAD\\b": "RD", r"\\bRD\\.$": "RD", r"\\bHIGHWAY\\b": "HWY",
+    r"\\bHWY\\.$": "HWY", r"\\bNORTH\\b": "N", r"\\bN\\.$": "N",
+    r"\\bSOUTH\\b": "S", r"\\bS\\.$": "S", r"\\bEAST\\b": "E",
+    r"\\bE\\.$": "E", r"\\bWEST\\b": "W", r"\\bW\\.$": "W"
+}
+
+def normalize_address_field(value):
+    if pd.isnull(value):
+        return ""
+    text = str(value).upper()
+    for pattern, replacement in ADDRESS_ABBREVIATIONS.items():
+        text = re.sub(pattern, replacement, text)
+    return re.sub(r'\s+', ' ', text.strip())
+
+st.title("🔍 Affinity Group CRM Matcher")
+st.markdown("Upload a customer list to match against our CRM.")
+
+uploaded = st.file_uploader("Upload file (CSV or Excel)", type=["csv", "xlsx"])
+
+if uploaded:
+    df = pd.read_csv(uploaded) if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+    required = ["companyName", "companyAddress", "companyAddress2", "companyCity", "companyState", "companyZipCode"]
+    if not all(col in df.columns for col in required):
+        st.error(f"Missing required columns: {', '.join(required)}")
+    else:
+        df["match_key"] = df.apply(lambda r: normalize_address_field(r["companyName"]) + ' ' +
+                                          normalize_address_field(r["companyAddress"]) + ' ' +
+                                          normalize_address_field(r["companyAddress2"]) + ' ' +
+                                          normalize_address_field(r["companyCity"]) + ' ' +
+                                          normalize_address_field(r["companyState"]) + ' ' +
+                                          str(r["companyZipCode"]), axis=1)
+
+        conn = get_conn()
+        cur = conn.cursor()
+
+        # Clean out previous matches
+        cur.execute("TRUNCATE TABLE TB_FUZZY_UPLOAD")
+
+        # Upload new data
+        for _, row in df.iterrows():
+            cur.execute(f"""
+                INSERT INTO TB_FUZZY_UPLOAD (
+                    UploadedCompanyName, UploadedAddress, UploadedCity,
+                    UploadedState, UploadedZip, match_key
+                ) VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                row["companyName"], row["companyAddress"], row["companyCity"],
+                row["companyState"], row["companyZipCode"], row["match_key"]
+            ))
+
+        st.success("Data uploaded. Matching now...")
+
+        result_df = pd.read_sql(f"SELECT * FROM VW_FUZZY_MATCH_RESULT", conn)
+
+        crm_fields = [c for c in result_df.columns if c not in ["match_score", "UploadedCompanyName"]]
+        selected_fields = st.multiselect("Select CRM fields to include in result:", crm_fields, default=["systemId", "companyName", "companyAddress"])
+
+        result_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
+        st.dataframe(result_df)
+
+        st.download_button("Download Matches as CSV", result_df.to_csv(index=False), file_name="matched_results.csv")
