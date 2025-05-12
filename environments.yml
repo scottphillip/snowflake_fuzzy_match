@@ -1,0 +1,8 @@
+name: fuzzy_env
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+      - streamlit
+      - pandas
+      - snowflake-connector-python
