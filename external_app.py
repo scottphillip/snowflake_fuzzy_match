@@ -5,12 +5,13 @@ import snowflake.connector
 import re
 
 # --- CONFIG ---
-SNOWFLAKE_ACCOUNT = "<your_account>.snowflakecomputing.com"
-SNOWFLAKE_USER = "<your_user>"
-SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]  # secure via Streamlit Cloud secrets
-SNOWFLAKE_DATABASE = "DB_PROD_TRF"
-SNOWFLAKE_SCHEMA = "SCH_TRF_UTILS"
-SNOWFLAKE_WAREHOUSE = "WH_SERV_PROD_BI"
+SNOWFLAKE_ACCOUNT = st.secrets["SNOWFLAKE_ACCOUNT"]
+SNOWFLAKE_USER = st.secrets["SNOWFLAKE_USER"]
+SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]
+SNOWFLAKE_DATABASE = st.secrets["SNOWFLAKE_DATABASE"]
+SNOWFLAKE_SCHEMA = st.secrets["SNOWFLAKE_SCHEMA"]
+SNOWFLAKE_WAREHOUSE = st.secrets["SNOWFLAKE_WAREHOUSE"]
+
 
 # Connect to Snowflake
 @st.cache_resource
