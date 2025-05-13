@@ -98,14 +98,14 @@ if uploaded:
             # ✅ Normalize all column names to uppercase
             result_df.columns = result_df.columns.str.upper()
 
-            filtered_df = result_df[result_df["name_score"] <= score_threshold]
+            filtered_df = result_df[result_df["NAME_SCORE"] <= score_threshold]
 
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["name_score", "address_score", "UPLOADEDCOMPANYNAME"]]
+                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SCORE", "ADDRESS_SCORE", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["systemId", "companyName", "companyAddress"])
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["name_score", "address_score"]]
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SCORE", "ADDRESS_SCORE"]]
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
