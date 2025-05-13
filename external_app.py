@@ -75,7 +75,8 @@ if uploaded:
             st.success("✅ Data uploaded. Running match...")
 
             # Slider for score filtering
-            score_threshold = st.slider("Max allowed match score (lower = better match)", 0, 150, 30)
+            score_threshold = st.slider("Max allowed name score (lower = better match)", 0, 100, 20)
+            filtered_df = result_df[result_df["name_score"] <= score_threshold]
 
             result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
             filtered_df = result_df[result_df["MATCH_SCORE"] <= score_threshold]
