@@ -88,7 +88,7 @@ if uploaded:
                 SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT
                 WHERE session_id = '{session_id}'
             """
-            result_df = pd.read_sql(query, conn)
+            result_df = pd.read_sql(query, conn, params={})  # triggers fresh fetch
             filtered_df = result_df[result_df["name_score"] <= score_threshold]
 
             if not filtered_df.empty:
