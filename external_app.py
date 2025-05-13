@@ -13,14 +13,21 @@ SNOWFLAKE_WAREHOUSE = st.secrets["SNOWFLAKE_WAREHOUSE"]
 
 @st.cache_resource
 def get_conn():
-    return snowflake.connector.connect(
-        user=SNOWFLAKE_USER,
-        password=SNOWFLAKE_PASSWORD,
-        account=SNOWFLAKE_ACCOUNT,
-        warehouse=SNOWFLAKE_WAREHOUSE,
-        database=SNOWFLAKE_DATABASE,
-        schema=SNOWFLAKE_SCHEMA
-    )
+    try:
+        return snowflake.connector.connect(
+            user=SNOWFLAKE_USER,
+            password=SNOWFLAKE_PASSWORD,
+            account=SNOWFLAKE_ACCOUNT,
+            warehouse=SNOWFLAKE_WAREHOUSE,
+            database=SNOWFLAKE_DATABASE,
+            schema=SNOWFLAKE_SCHEMA,
+            session_parameters={
+                'CLIENT_SESSION_KEEP_ALIVE': True
+            }
+        )
+    except Exception as e:
+        st.error(f"❌ Could not connect to Snowflake: {e}")
+        st.stop()
 
 ADDRESS_ABBREVIATIONS = {
     r"\bSTREET\b": "ST", r"\bST\.$": "ST", r"\bSAINT\b": "ST",
