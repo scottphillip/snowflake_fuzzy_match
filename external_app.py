@@ -91,14 +91,14 @@ if uploaded:
             result_df = pd.read_sql(query, conn)
             result_df.columns = result_df.columns.str.upper()
 
-            filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
+            filtered_df = result_df[result_df[""] >= similarity_threshold]
 
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
+                available_fields = [col for col in filtered_df.columns if col not in ["", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["", "ADDRESS_SIMILARITY"]]
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
