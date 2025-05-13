@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import snowflake.connector
 import re
+import uuid
 
 # --- CONFIG ---
 SNOWFLAKE_USER = st.secrets["SNOWFLAKE_USER"]
@@ -57,17 +58,16 @@ if uploaded:
         st.error(f"Missing required columns: {', '.join(required)}")
     else:
         df["match_key"] = df.apply(lambda r: normalize_address_field(r["companyName"]) + ' ' + str(r["companyZipCode"]), axis=1)
+        session_id = str(uuid.uuid4())
 
         conn = get_conn()
         cur = conn.cursor()
 
         try:
-            cur.execute("TRUNCATE TABLE DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD")
-
             insert_sql = """
                 INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD
-                (UploadedCompanyName, UploadedAddress, UploadedCity, UploadedState, UploadedZip, match_key)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                (UploadedCompanyName, UploadedAddress, UploadedCity, UploadedState, UploadedZip, match_key, session_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
             for _, row in df.iterrows():
                 cur.execute(insert_sql, (
@@ -76,20 +76,23 @@ if uploaded:
                     str(row["companyCity"]),
                     str(row["companyState"]),
                     str(row["companyZipCode"]),
-                    str(row["match_key"])
+                    str(row["match_key"]),
+                    session_id
                 ))
 
             st.success("✅ Data uploaded. Running match...")
 
-            # Slider for score filtering
             score_threshold = st.slider("Max allowed name score (lower = better match)", 0, 100, 20)
+
+            query = f"""
+                SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT
+                WHERE session_id = '{session_id}'
+            """
+            result_df = pd.read_sql(query, conn)
             filtered_df = result_df[result_df["name_score"] <= score_threshold]
 
-            result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
-            filtered_df = result_df[result_df["MATCH_SCORE"] <= score_threshold]
-
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
+                available_fields = [col for col in filtered_df.columns if col not in ["name_score", "address_score", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["systemId", "companyName", "companyAddress"])
 
