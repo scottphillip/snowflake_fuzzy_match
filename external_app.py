@@ -22,9 +22,7 @@ def get_conn():
             warehouse=SNOWFLAKE_WAREHOUSE,
             database=SNOWFLAKE_DATABASE,
             schema=SNOWFLAKE_SCHEMA,
-            session_parameters={
-                'CLIENT_SESSION_KEEP_ALIVE': True
-            }
+            session_parameters={'CLIENT_SESSION_KEEP_ALIVE': True}
         )
     except Exception as e:
         st.error(f"❌ Could not connect to Snowflake: {e}")
@@ -90,24 +88,24 @@ if uploaded:
             """
             result_df = pd.read_sql(query, conn)
             result_df.columns = result_df.columns.str.upper()
-            st.write(\"Columns loaded from Snowflake:\")
-            st.write(result_df.columns.tolist())
 
-            st.write(\"Preview of first few rows:\")
+            # Debug preview
+            st.write("🔍 Columns loaded from Snowflake:")
+            st.write(result_df.columns.tolist())
             st.dataframe(result_df.head())
 
-            if \"NAME_SIMILARITY\" not in result_df.columns:
-            st.error(\"❌ Missing NAME_SIMILARITY in result set.\")
-            st.stop()
+            if "NAME_SIMILARITY" not in result_df.columns:
+                st.error("❌ 'NAME_SIMILARITY' column not found in result set.")
+                st.stop()
 
-            filtered_df = result_df[result_df[""] >= similarity_threshold]
+            filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
 
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
+                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["", "ADDRESS_SIMILARITY"]]
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
