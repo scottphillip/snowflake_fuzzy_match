@@ -89,10 +89,6 @@ if uploaded:
             result_df = pd.read_sql(query, conn)
             result_df.columns = result_df.columns.str.upper()
 
-            st.write("🔍 Columns loaded from Snowflake:")
-            st.write(result_df.columns.tolist())
-            st.dataframe(result_df.head())
-
             if "NAME_SIMILARITY" not in result_df.columns:
                 st.error("❌ 'NAME_SIMILARITY' column not found in result set.")
                 st.stop()
@@ -100,18 +96,16 @@ if uploaded:
             filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
 
             if not filtered_df.empty:
-                # Identify known upload/internal fields to exclude from the CRM selector
+                # Fields NOT used for CRM reference selection
                 excluded_fields = {
-                    "UPLOADEDCOMPANYNAME", "UPLOADEDADDRESS", "UPLOADEDCITY",
-                    "UPLOADEDSTATE", "UPLOADEDZIP", "SESSION_ID",
-                    "NAME_SIMILARITY", "ADDRESS_SIMILARITY"
+                    "UPLOADEDCOMPANYNAME", "UPLOADEDADDRESS", "UPLOADEDCITY", "UPLOADEDSTATE",
+                    "UPLOADEDZIP", "SESSION_ID", "NAME_SIMILARITY", "ADDRESS_SIMILARITY"
                 }
 
-                # ✅ Only show true CRM fields, sorted alphabetically
-                available_fields = sorted([col for col in result_df.columns if col not in excluded_fields])
+                available_fields = sorted([col for col in filtered_df.columns if col not in excluded_fields])
 
                 selected_fields = st.multiselect(
-                    "Select CRM fields to include:",
+                    "Select CRM fields to include in download:",
                     options=available_fields,
                     default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"]
                 )
@@ -125,4 +119,3 @@ if uploaded:
 
         except Exception as e:
             st.error(f"❌ Matching error: {e}")
-
