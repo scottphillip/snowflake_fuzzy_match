@@ -89,7 +89,6 @@ if uploaded:
             result_df = pd.read_sql(query, conn)
             result_df.columns = result_df.columns.str.upper()
 
-            # Debug preview
             st.write("🔍 Columns loaded from Snowflake:")
             st.write(result_df.columns.tolist())
             st.dataframe(result_df.head())
@@ -101,7 +100,12 @@ if uploaded:
             filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
 
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
+                excluded_fields = {
+                    "NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME",
+                    "UPLOADEDADDRESS", "UPLOADEDCITY", "UPLOADEDSTATE", "UPLOADEDZIP", "SESSION_ID"
+                }
+                available_fields = sorted([col for col in filtered_df.columns if col not in excluded_fields])
+
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
@@ -114,3 +118,4 @@ if uploaded:
 
         except Exception as e:
             st.error(f"❌ Matching error: {e}")
+
