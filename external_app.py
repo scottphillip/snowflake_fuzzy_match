@@ -5,12 +5,12 @@ import snowflake.connector
 import re
 
 # --- CONFIG ---
-SNOWFLAKE_USER = "SRV_USR_DEV_BI"
-SNOWFLAKE_PASSWORD = "Temp@123456789"
-SNOWFLAKE_ACCOUNT = "xda11449.east-us-2.azure"
-SNOWFLAKE_DATABASE = "DB_PROD_TRF"
-SNOWFLAKE_SCHEMA = "SCH_TRF_UTILS"
-SNOWFLAKE_WAREHOUSE = "WH_SERV_DEV_BI"
+SNOWFLAKE_USER = st.secrets["SNOWFLAKE_USER"]
+SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]
+SNOWFLAKE_ACCOUNT = st.secrets["SNOWFLAKE_ACCOUNT"]
+SNOWFLAKE_DATABASE = st.secrets["SNOWFLAKE_DATABASE"]
+SNOWFLAKE_SCHEMA = st.secrets["SNOWFLAKE_SCHEMA"]
+SNOWFLAKE_WAREHOUSE = st.secrets["SNOWFLAKE_WAREHOUSE"]
 
 # Connect to Snowflake
 @st.cache_resource
@@ -64,44 +64,34 @@ if uploaded:
         conn = get_conn()
         cur = conn.cursor()
 
-        # Clean out previous matches
-        cur.execute("TRUNCATE TABLE TB_FUZZY_UPLOAD")
+        try:
+            # Clean out previous matches
+            cur.execute("TRUNCATE TABLE DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD")
 
-        # Upload new data
-        for _, row in df.iterrows():
-            cur.execute(f"""
-                INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD (
-                    UploadedCompanyName, UploadedAddress, UploadedCity,
-                    UploadedState, UploadedZip, match_key
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                row["companyName"], row["companyAddress"], row["companyCity"],
-                row["companyState"], row["companyZipCode"], row["match_key"]
-            ))
+            # Upload new data
+            for _, row in df.iterrows():
+                cur.execute("""
+                    INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD (
+                        UploadedCompanyName, UploadedAddress, UploadedCity,
+                        UploadedState, UploadedZip, match_key
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    row["companyName"], row["companyAddress"], row["companyCity"],
+                    row["companyState"], row["companyZipCode"], row["match_key"]
+                ))
 
+            st.success("✅ Data uploaded. Running matches now...")
 
-        st.success("Data uploaded. Matching now...")
+            result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
-        result_df = pd.read_sql(f"SELECT * FROM VW_FUZZY_MATCH_RESULT", conn)
+            crm_fields = [c for c in result_df.columns if c not in ["match_score", "UploadedCompanyName"]]
+            selected_fields = st.multiselect("Select CRM fields to include in result:", crm_fields, default=["systemId", "companyName", "companyAddress"])
 
-        crm_fields = [c for c in result_df.columns if c not in ["match_score", "UploadedCompanyName"]]
-        selected_fields = st.multiselect("Select CRM fields to include in result:", crm_fields, default=["systemId", "companyName", "companyAddress"])
+            result_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
+            st.dataframe(result_df)
 
-        result_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
-        st.dataframe(result_df)
+            st.download_button("Download Matches as CSV", result_df.to_csv(index=False), file_name="matched_results.csv")
 
-        st.download_button("Download Matches as CSV", result_df.to_csv(index=False), file_name="matched_results.csv")
-
-try:
-    conn = snowflake.connector.connect(
-        user=SNOWFLAKE_USER,
-        password=SNOWFLAKE_PASSWORD,
-        account=SNOWFLAKE_ACCOUNT,
-        warehouse=SNOWFLAKE_WAREHOUSE,
-        database=SNOWFLAKE_DATABASE,
-        schema=SNOWFLAKE_SCHEMA
-    )
-except Exception as e:
-    st.error(f"Connection failed: {e}")
-    st.stop()
-
+        except Exception as e:
+            st.error(f"Error during match process: {e}")
+            st.stop()
