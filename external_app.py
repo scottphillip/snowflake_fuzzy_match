@@ -1,4 +1,3 @@
-# external_app.py
 import streamlit as st
 import pandas as pd
 import snowflake.connector
@@ -24,15 +23,15 @@ def get_conn():
         schema=SNOWFLAKE_SCHEMA
     )
 
-# Clean and normalize address fields
+# Normalize addresses
 ADDRESS_ABBREVIATIONS = {
-    r"\\bSTREET\\b": "ST", r"\\bST\\.$": "ST", r"\\bSAINT\\b": "ST",
-    r"\\bAVENUE\\b": "AVE", r"\\bAVE\\.$": "AVE", r"\\bDRIVE\\b": "DR",
-    r"\\bDR\\.$": "DR", r"\\bCOURT\\b": "CT", r"\\bCT\\.$": "CT",
-    r"\\bROAD\\b": "RD", r"\\bRD\\.$": "RD", r"\\bHIGHWAY\\b": "HWY",
-    r"\\bHWY\\.$": "HWY", r"\\bNORTH\\b": "N", r"\\bN\\.$": "N",
-    r"\\bSOUTH\\b": "S", r"\\bS\\.$": "S", r"\\bEAST\\b": "E",
-    r"\\bE\\.$": "E", r"\\bWEST\\b": "W", r"\\bW\\.$": "W"
+    r"\bSTREET\b": "ST", r"\bST\.$": "ST", r"\bSAINT\b": "ST",
+    r"\bAVENUE\b": "AVE", r"\bAVE\.$": "AVE", r"\bDRIVE\b": "DR",
+    r"\bDR\.$": "DR", r"\bCOURT\b": "CT", r"\bCT\.$": "CT",
+    r"\bROAD\b": "RD", r"\bRD\.$": "RD", r"\bHIGHWAY\b": "HWY",
+    r"\bHWY\.$": "HWY", r"\bNORTH\b": "N", r"\bN\.$": "N",
+    r"\bSOUTH\b": "S", r"\bS\.$": "S", r"\bEAST\b": "E",
+    r"\bE\.$": "E", r"\bWEST\b": "W", r"\bW\.$": "W"
 }
 
 def normalize_address_field(value):
@@ -44,7 +43,7 @@ def normalize_address_field(value):
     return re.sub(r'\s+', ' ', text.strip())
 
 st.title("🔍 Affinity Group CRM Matcher")
-st.markdown("Upload a customer list to match against our CRM.")
+st.markdown("Upload a customer list to match against our CRM system.")
 
 uploaded = st.file_uploader("Upload file (CSV or Excel)", type=["csv", "xlsx"])
 
@@ -65,33 +64,39 @@ if uploaded:
         cur = conn.cursor()
 
         try:
-            # Clean out previous matches
             cur.execute("TRUNCATE TABLE DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD")
 
-            # Upload new data
-            for _, row in df.iterrows():
-                cur.execute("""
-                    INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD (
-                        UploadedCompanyName, UploadedAddress, UploadedCity,
-                        UploadedState, UploadedZip, match_key
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    row["companyName"], row["companyAddress"], row["companyCity"],
-                    row["companyState"], row["companyZipCode"], row["match_key"]
-                ))
+            insert_sql = """
+                INSERT INTO DB_PROD_TRF.SCH_TRF_UTILS.TB_FUZZY_UPLOAD
+                (UploadedCompanyName, UploadedAddress, UploadedCity, UploadedState, UploadedZip, match_key)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
 
-            st.success("✅ Data uploaded. Running matches now...")
+            for _, row in df.iterrows():
+                try:
+                    cur.execute(insert_sql, (
+                        str(row["companyName"]),
+                        str(row["companyAddress"]),
+                        str(row["companyCity"]),
+                        str(row["companyState"]),
+                        str(row["companyZipCode"]),
+                        str(row["match_key"])
+                    ))
+                except Exception as insert_error:
+                    st.warning(f"Failed to insert row: {insert_error}")
+
+            st.success("✅ Data uploaded. Running match...")
 
             result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
             crm_fields = [c for c in result_df.columns if c not in ["match_score", "UploadedCompanyName"]]
-            selected_fields = st.multiselect("Select CRM fields to include in result:", crm_fields, default=["systemId", "companyName", "companyAddress"])
+            selected_fields = st.multiselect("Select CRM fields to include:", crm_fields,
+                                             default=["systemId", "companyName", "companyAddress"])
 
             result_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
             st.dataframe(result_df)
 
-            st.download_button("Download Matches as CSV", result_df.to_csv(index=False), file_name="matched_results.csv")
+            st.download_button("Download Matches", result_df.to_csv(index=False), "matched_results.csv")
 
         except Exception as e:
-            st.error(f"Error during match process: {e}")
-            st.stop()
+            st.error(f"❌ Matching error: {e}")
