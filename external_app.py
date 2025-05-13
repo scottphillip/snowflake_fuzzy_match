@@ -3,6 +3,7 @@ import pandas as pd
 import snowflake.connector
 import re
 
+# --- CONFIG ---
 SNOWFLAKE_USER = st.secrets["SNOWFLAKE_USER"]
 SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]
 SNOWFLAKE_ACCOUNT = st.secrets["SNOWFLAKE_ACCOUNT"]
@@ -49,11 +50,7 @@ if uploaded:
         st.error(f"Missing required columns: {', '.join(required)}")
     else:
         df["match_key"] = df.apply(lambda r: normalize_address_field(r["companyName"]) + ' ' +
-                                          normalize_address_field(r["companyAddress"]) + ' ' +
-                                          normalize_address_field(r["companyAddress2"]) + ' ' +
-                                          normalize_address_field(r["companyCity"]) + ' ' +
-                                          normalize_address_field(r["companyState"]) + ' ' +
-                                          str(r["companyZipCode"]), axis=1)
+                                          normalize_address_field(r["companyZipCode"]), axis=1)
 
         conn = get_conn()
         cur = conn.cursor()
@@ -79,11 +76,14 @@ if uploaded:
             st.success("✅ Data uploaded. Running match...")
             result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
-            available_fields = [col for col in result_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
+            score_threshold = st.slider("Max allowed match score (lower is stricter)", 0, 150, 30)
+            filtered_df = result_df[result_df["MATCH_SCORE"] <= score_threshold]
+
+            available_fields = [col for col in filtered_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
             selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                              default=["systemId", "companyName", "companyAddress"])
 
-            final_df = result_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
+            final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
             st.dataframe(final_df)
 
             st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
