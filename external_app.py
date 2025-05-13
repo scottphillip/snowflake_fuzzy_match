@@ -103,7 +103,7 @@ if uploaded:
             if not filtered_df.empty:
                 available_fields = [col for col in filtered_df.columns if col not in ["NAME_SCORE", "ADDRESS_SCORE", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
-                                                 default=["systemId", "companyName", "companyAddress"])
+                                                 default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
                 final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SCORE", "ADDRESS_SCORE"]]
                 st.dataframe(final_df)
