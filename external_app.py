@@ -49,8 +49,7 @@ if uploaded:
     if not all(col in df.columns for col in required):
         st.error(f"Missing required columns: {', '.join(required)}")
     else:
-        df["match_key"] = df.apply(lambda r: normalize_address_field(r["companyName"]) + ' ' +
-                                          normalize_address_field(r["companyZipCode"]), axis=1)
+        df["match_key"] = df.apply(lambda r: normalize_address_field(r["companyName"]) + ' ' + str(r["companyZipCode"]), axis=1)
 
         conn = get_conn()
         cur = conn.cursor()
@@ -74,19 +73,24 @@ if uploaded:
                 ))
 
             st.success("✅ Data uploaded. Running match...")
-            result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
-            score_threshold = st.slider("Max allowed match score (lower is stricter)", 0, 150, 30)
+            # Slider for score filtering
+            score_threshold = st.slider("Max allowed match score (lower = better match)", 0, 150, 30)
+
+            result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
             filtered_df = result_df[result_df["MATCH_SCORE"] <= score_threshold]
 
-            available_fields = [col for col in filtered_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
-            selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
-                                             default=["systemId", "companyName", "companyAddress"])
+            if not filtered_df.empty:
+                available_fields = [col for col in filtered_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
+                selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
+                                                 default=["systemId", "companyName", "companyAddress"])
 
-            final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
-            st.dataframe(final_df)
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
+                st.dataframe(final_df)
+                st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
-            st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
+            else:
+                st.warning("⚠️ No matches found under the selected threshold. Try increasing the allowed match score.")
 
         except Exception as e:
             st.error(f"❌ Matching error: {e}")
