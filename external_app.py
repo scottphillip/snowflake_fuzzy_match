@@ -3,7 +3,6 @@ import pandas as pd
 import snowflake.connector
 import re
 
-# --- CONFIG ---
 SNOWFLAKE_USER = st.secrets["SNOWFLAKE_USER"]
 SNOWFLAKE_PASSWORD = st.secrets["SNOWFLAKE_PASSWORD"]
 SNOWFLAKE_ACCOUNT = st.secrets["SNOWFLAKE_ACCOUNT"]
@@ -11,7 +10,6 @@ SNOWFLAKE_DATABASE = st.secrets["SNOWFLAKE_DATABASE"]
 SNOWFLAKE_SCHEMA = st.secrets["SNOWFLAKE_SCHEMA"]
 SNOWFLAKE_WAREHOUSE = st.secrets["SNOWFLAKE_WAREHOUSE"]
 
-# Connect to Snowflake
 @st.cache_resource
 def get_conn():
     return snowflake.connector.connect(
@@ -23,7 +21,6 @@ def get_conn():
         schema=SNOWFLAKE_SCHEMA
     )
 
-# Normalize addresses
 ADDRESS_ABBREVIATIONS = {
     r"\bSTREET\b": "ST", r"\bST\.$": "ST", r"\bSAINT\b": "ST",
     r"\bAVENUE\b": "AVE", r"\bAVE\.$": "AVE", r"\bDRIVE\b": "DR",
@@ -43,8 +40,6 @@ def normalize_address_field(value):
     return re.sub(r'\s+', ' ', text.strip())
 
 st.title("🔍 Affinity Group CRM Matcher")
-st.markdown("Upload a customer list to match against our CRM system.")
-
 uploaded = st.file_uploader("Upload file (CSV or Excel)", type=["csv", "xlsx"])
 
 if uploaded:
@@ -71,49 +66,27 @@ if uploaded:
                 (UploadedCompanyName, UploadedAddress, UploadedCity, UploadedState, UploadedZip, match_key)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """
-
             for _, row in df.iterrows():
-                try:
-                    cur.execute(insert_sql, (
-                        str(row["companyName"]),
-                        str(row["companyAddress"]),
-                        str(row["companyCity"]),
-                        str(row["companyState"]),
-                        str(row["companyZipCode"]),
-                        str(row["match_key"])
-                    ))
-                except Exception as insert_error:
-                    st.warning(f"Failed to insert row: {insert_error}")
+                cur.execute(insert_sql, (
+                    str(row["companyName"]),
+                    str(row["companyAddress"]),
+                    str(row["companyCity"]),
+                    str(row["companyState"]),
+                    str(row["companyZipCode"]),
+                    str(row["match_key"])
+                ))
 
             st.success("✅ Data uploaded. Running match...")
-
             result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
-            # Dynamically detect all available fields from CRM view (excluding the upload and score metadata)
-            available_fields = [col for col in result_df.columns if col not in ["match_score", "UploadedCompanyName"]]
+            available_fields = [col for col in result_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
+            selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
+                                             default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
-            selected_fields = st.multiselect(
-                "Select CRM fields to include in result:",
-                available_fields,
-                default=["systemId", "companyName", "companyAddress"]
-            )
-
-            # Safely subset dataframe based on user-selected fields
             final_df = result_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
             st.dataframe(final_df)
 
-            # Download option
-            st.download_button(
-                label="Download Matches",
-                data=final_df.to_csv(index=False),
-                file_name="matched_results.csv",
-                key="download_matched_csv"
-            )
-
-
-            st.dataframe(result_df)
-
-            st.download_button("Download Matches", result_df.to_csv(index=False), "matched_results.csv")
+            st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
         except Exception as e:
             st.error(f"❌ Matching error: {e}")
