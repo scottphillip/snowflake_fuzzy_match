@@ -89,11 +89,22 @@ if uploaded:
 
             result_df = pd.read_sql("SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT", conn)
 
-            crm_fields = [c for c in result_df.columns if c not in ["match_score", "UploadedCompanyName"]]
-            selected_fields = st.multiselect("Select CRM fields to include:", crm_fields,
-                                             default=["systemId", "companyName", "companyAddress"])
+            # Dynamically detect all available fields from CRM view (excluding the upload and score metadata)
+            available_fields = [col for col in result_df.columns if col not in ["match_score", "UploadedCompanyName"]]
 
-            result_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
+            selected_fields = st.multiselect(
+                "Select CRM fields to include in result:",
+                available_fields,
+                default=["systemId", "companyName", "companyAddress"]
+            )
+
+            # Safely subset dataframe based on user-selected fields
+            final_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
+            st.dataframe(final_df)
+
+            # Download option
+            st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv")
+
             st.dataframe(result_df)
 
             st.download_button("Download Matches", result_df.to_csv(index=False), "matched_results.csv")
