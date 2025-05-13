@@ -82,35 +82,28 @@ if uploaded:
 
             st.success("✅ Data uploaded. Running match...")
 
-            score_threshold = st.slider("Max allowed name score (lower = better match)", 0, 100, 20)
+            similarity_threshold = st.slider("Minimum name similarity score (0.0 to 1.0)", 0.70, 1.0, 0.90, step=0.01)
 
-            query = f"""
-                SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT
-                WHERE session_id = '{session_id}'
-            """
-            result_df = pd.read_sql(query, conn, params={})  # triggers fresh fetch
             query = f"""
                 SELECT * FROM DB_PROD_TRF.SCH_TRF_UTILS.VW_FUZZY_MATCH_RESULT
                 WHERE session_id = '{session_id}'
             """
             result_df = pd.read_sql(query, conn)
-
-            # ✅ Normalize all column names to uppercase
             result_df.columns = result_df.columns.str.upper()
 
-            filtered_df = result_df[result_df["NAME_SCORE"] <= score_threshold]
+            filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
 
             if not filtered_df.empty:
-                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SCORE", "ADDRESS_SCORE", "UPLOADEDCOMPANYNAME"]]
+                available_fields = [col for col in filtered_df.columns if col not in ["NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME"]]
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SCORE", "ADDRESS_SCORE"]]
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
             else:
-                st.warning("⚠️ No matches found under the selected threshold. Try increasing the allowed match score.")
+                st.warning("⚠️ No matches found at or above the selected similarity threshold.")
 
         except Exception as e:
             st.error(f"❌ Matching error: {e}")
