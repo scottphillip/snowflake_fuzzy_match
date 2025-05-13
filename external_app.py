@@ -110,7 +110,13 @@ if uploaded:
                     default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"]
                 )
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
+                upload_fields = [
+                    "UPLOADEDCOMPANYNAME", "UPLOADEDADDRESS", "UPLOADEDCITY",
+                    "UPLOADEDSTATE", "UPLOADEDZIP"
+                ]
+
+                final_df = filtered_df[upload_fields + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
+
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
