@@ -85,7 +85,7 @@ if uploaded:
                 selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
                                                  default=["systemId", "companyName", "companyAddress"])
 
-                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
+                final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["name_score", "address_score"]]
                 st.dataframe(final_df)
                 st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv", key="download_button")
 
