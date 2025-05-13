@@ -100,14 +100,21 @@ if uploaded:
             filtered_df = result_df[result_df["NAME_SIMILARITY"] >= similarity_threshold]
 
             if not filtered_df.empty:
+                # Identify known upload/internal fields to exclude from the CRM selector
                 excluded_fields = {
-                    "NAME_SIMILARITY", "ADDRESS_SIMILARITY", "UPLOADEDCOMPANYNAME",
-                    "UPLOADEDADDRESS", "UPLOADEDCITY", "UPLOADEDSTATE", "UPLOADEDZIP", "SESSION_ID"
+                    "UPLOADEDCOMPANYNAME", "UPLOADEDADDRESS", "UPLOADEDCITY",
+                    "UPLOADEDSTATE", "UPLOADEDZIP", "SESSION_ID",
+                    "NAME_SIMILARITY", "ADDRESS_SIMILARITY"
                 }
-                available_fields = sorted([col for col in filtered_df.columns if col not in excluded_fields])
 
-                selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
-                                                 default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
+                # ✅ Only show true CRM fields, sorted alphabetically
+                available_fields = sorted([col for col in result_df.columns if col not in excluded_fields])
+
+                selected_fields = st.multiselect(
+                    "Select CRM fields to include:",
+                    options=available_fields,
+                    default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"]
+                )
 
                 final_df = filtered_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["NAME_SIMILARITY", "ADDRESS_SIMILARITY"]]
                 st.dataframe(final_df)
