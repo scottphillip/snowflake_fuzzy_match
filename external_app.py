@@ -90,6 +90,15 @@ if uploaded:
             """
             result_df = pd.read_sql(query, conn)
             result_df.columns = result_df.columns.str.upper()
+            st.write(\"Columns loaded from Snowflake:\")
+            st.write(result_df.columns.tolist())
+
+            st.write(\"Preview of first few rows:\")
+            st.dataframe(result_df.head())
+
+            if \"NAME_SIMILARITY\" not in result_df.columns:
+            st.error(\"❌ Missing NAME_SIMILARITY in result set.\")
+            st.stop()
 
             filtered_df = result_df[result_df[""] >= similarity_threshold]
 
