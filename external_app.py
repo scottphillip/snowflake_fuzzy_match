@@ -81,7 +81,7 @@ if uploaded:
 
             available_fields = [col for col in result_df.columns if col not in ["MATCH_SCORE", "UPLOADEDCOMPANYNAME"]]
             selected_fields = st.multiselect("Select CRM fields to include:", available_fields,
-                                             default=["SYSTEMID", "COMPANYNAME", "COMPANYADDRESS"])
+                                             default=["systemId", "companyName", "companyAddress"])
 
             final_df = result_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
             st.dataframe(final_df)
