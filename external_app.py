@@ -103,7 +103,13 @@ if uploaded:
             st.dataframe(final_df)
 
             # Download option
-            st.download_button("Download Matches", final_df.to_csv(index=False), "matched_results.csv")
+            st.download_button(
+                label="Download Matches",
+                data=final_df.to_csv(index=False),
+                file_name="matched_results.csv",
+                key="download_matched_csv"
+            )
+
 
             st.dataframe(result_df)
 
