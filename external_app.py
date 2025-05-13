@@ -99,7 +99,7 @@ if uploaded:
             )
 
             # Safely subset dataframe based on user-selected fields
-            final_df = result_df[["UploadedCompanyName"] + selected_fields + ["match_score"]]
+            final_df = result_df[["UPLOADEDCOMPANYNAME"] + selected_fields + ["MATCH_SCORE"]]
             st.dataframe(final_df)
 
             # Download option
