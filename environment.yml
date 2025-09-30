@@ -6,3 +6,6 @@ dependencies:
       - streamlit
       - pandas
       - snowflake-connector-python
+      - openpyxl  # For Excel file support
+      - xlrd      # For older Excel file support
+      - chardet   # For encoding detection
