@@ -417,8 +417,8 @@ if uploaded and not st.session_state.processing:
                     if not st.session_state.processing:  # Allow cancellation
                         break
                     
-                    # ADD THIS LINE - Keep session alive every 50 records:
-                    if row_idx % 50 == 0:
+                    # Keep session alive every 200 records to avoid interfering with processing
+                    if row_idx % 200 == 0:
                         keep_session_alive()
                         
                     uploaded_name_norm = uploaded_row['normalized_company_name']
@@ -570,12 +570,11 @@ if uploaded and not st.session_state.processing:
                     overall_progress = min(1.0, processed_records / total_records)
                     progress_bar.progress(overall_progress, text=f"Processing {uploaded_row['companyName'][:30]}... in {state_abbrev}")
                     
-                    # MODIFY THIS SECTION - Add st.rerun() every 100 records:
                     # Update metrics every 100 records to prevent session timeout
                     if processed_records % 100 == 0:
                         processed_metric.metric("Records Processed", f"{processed_records:,}")
                         matches_metric.metric("Matches Found", f"{len(matches):,}")
-                        st.rerun()  # Force refresh to keep connection alive
+                        # Don't use st.rerun() as it resets the processing state
                 
                 # Final metrics update for this state
                 processed_metric.metric("Records Processed", f"{processed_records:,}")
