@@ -24,6 +24,18 @@ SNOWFLAKE_WAREHOUSE = st.secrets["SNOWFLAKE_WAREHOUSE"]
 MAX_RETRIES = 3
 RETRY_DELAY = 2
 
+# ADD THIS NEW FUNCTION HERE:
+def keep_session_alive():
+    """Keep Streamlit session alive during long processing"""
+    if 'heartbeat' not in st.session_state:
+        st.session_state.heartbeat = time.time()
+    
+    # Update every 30 seconds
+    if time.time() - st.session_state.heartbeat > 30:
+        st.session_state.heartbeat = time.time()
+        st.empty()  # This keeps the session alive
+        time.sleep(0.1)
+
 def get_conn_with_retry():
     """Get Snowflake connection with robust retry logic"""
     for attempt in range(MAX_RETRIES):
@@ -49,11 +61,15 @@ def get_conn_with_retry():
             else:
                 raise e
 
+# MODIFY THIS FUNCTION - ADD keep_session_alive() call:
 def execute_query_safe(query, max_retries=3):
     """Execute query with comprehensive error handling"""
     for attempt in range(max_retries):
         conn = None
         try:
+            # ADD THIS LINE:
+            keep_session_alive()
+            
             conn = get_conn_with_retry()
             df = pd.read_sql(query, conn)
             return df
@@ -150,13 +166,16 @@ def normalize_address(text):
     
     return normalized
 
-# Initialize session state
+# Initialize session state - ADD HEARTBEAT HERE:
 if 'processing' not in st.session_state:
     st.session_state.processing = False
 if 'matches' not in st.session_state:
     st.session_state.matches = []
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
+# ADD THIS LINE:
+if 'heartbeat' not in st.session_state:
+    st.session_state.heartbeat = time.time()
 
 st.title("🔗 Affinity Group CRM Matcher - Latest Version")
 st.markdown("**Complete version with auto-download, robust error handling, and all CRM fields**")
@@ -397,6 +416,10 @@ if uploaded and not st.session_state.processing:
                 for row_idx, uploaded_row in state_df.iterrows():
                     if not st.session_state.processing:  # Allow cancellation
                         break
+                    
+                    # ADD THIS LINE - Keep session alive every 50 records:
+                    if row_idx % 50 == 0:
+                        keep_session_alive()
                         
                     uploaded_name_norm = uploaded_row['normalized_company_name']
                     uploaded_addr_norm = uploaded_row['normalized_address']
@@ -547,9 +570,16 @@ if uploaded and not st.session_state.processing:
                     overall_progress = min(1.0, processed_records / total_records)
                     progress_bar.progress(overall_progress, text=f"Processing {uploaded_row['companyName'][:30]}... in {state_abbrev}")
                     
-                    # Update metrics
-                    processed_metric.metric("Records Processed", f"{processed_records:,}")
-                    matches_metric.metric("Matches Found", f"{len(matches):,}")
+                    # MODIFY THIS SECTION - Add st.rerun() every 100 records:
+                    # Update metrics every 100 records to prevent session timeout
+                    if processed_records % 100 == 0:
+                        processed_metric.metric("Records Processed", f"{processed_records:,}")
+                        matches_metric.metric("Matches Found", f"{len(matches):,}")
+                        st.rerun()  # Force refresh to keep connection alive
+                
+                # Final metrics update for this state
+                processed_metric.metric("Records Processed", f"{processed_records:,}")
+                matches_metric.metric("Matches Found", f"{len(matches):,}")
                 
             except Exception as e:
                 st.error(f"❌ Error processing state {state_abbrev}: {e}")
@@ -797,3 +827,4 @@ st.markdown("- ✅ **Field selection** - Choose exactly what to export")
 st.markdown("- ✅ **Robust error handling** - Connection recovery & retry logic")
 st.markdown("- ✅ **Session state management** - Progress tracking & cancellation")
 st.markdown("- ✅ **Optimized for deployment** - Ready for Streamlit Cloud")
+st.markdown("- ✅ **Connection keep-alive** - Prevents WebSocket disconnections")
